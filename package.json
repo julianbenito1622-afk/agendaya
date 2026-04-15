@@ -1,0 +1,8 @@
+{
+  "name": "agendaya",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
