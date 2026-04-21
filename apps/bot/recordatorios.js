@@ -1,12 +1,13 @@
+import 'dotenv/config'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
-  'https://dzrkbtksjgxqcmqgnbbc.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6cmtidGtzamd4cWNtcWduYmJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzOTQzNDIsImV4cCI6MjA5MTk3MDM0Mn0.zP5c4xRc9VRnZFu5SBWz7tE47KL-qfzB8tbT6VGoJnw'
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
 )
 
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN
-const PHONE_ID = process.env.PHONE_ID
+const PHONE_ID = process.env.WHATSAPP_PHONE_ID
 
 async function enviarMensaje(telefono, mensaje) {
   await fetch(`https://graph.facebook.com/v25.0/${PHONE_ID}/messages`, {
