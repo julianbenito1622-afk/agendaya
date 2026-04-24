@@ -6,32 +6,41 @@ const supabase = createClient(
   process.env.SUPABASE_KEY
 )
 
-const SERVICIOS = {
-  '1': 'Corte',
-  '2': 'Tinte',
-  '3': 'Peinado',
-  '4': 'Manicure'
-}
-
 async function verificarLimite(salonId, salon) {
   if (!salonId) return { permitido: true }
-
-  const limites = {
-    'free': 15,
-    'basico': 50,
-    'premium': 999999
-  }
-
+  const limites = { 'free': 15, 'basico': 50, 'premium': 999999 }
   const limite = limites[salon?.plan] || 15
-
   if ((salon?.citas_mes || 0) >= limite) {
     return {
       permitido: false,
-      mensaje: `Tu salón llegó al límite de *${limite} citas* del plan *${salon?.plan || 'free'}*.\n\nPara continuar agendando escribe a AgendaYa:\nwa.me/51999999999`
+      mensaje: `Tu salón llegó al límite de *${limite} citas* del plan *${salon?.plan || 'free'}*.\n\nPara subir de plan escribe a AgendaYa:\nwa.me/51913276046`
     }
   }
-
   return { permitido: true }
+}
+
+async function obtenerConfigSalon(salonId) {
+  const { data } = await supabase
+    .from('config_salon')
+    .select('*')
+    .eq('salon_id', salonId)
+    .maybeSingle()
+  return data
+}
+
+async function obtenerServiciosSalon(salonId) {
+  const { data } = await supabase
+    .from('servicios_salon')
+    .select('*')
+    .eq('salon_id', salonId)
+    .eq('activo', true)
+    .order('created_at', { ascending: true })
+  return data || []
+}
+
+function construirMenuServicios(servicios) {
+  const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣']
+  return servicios.map((s, i) => `${emojis[i] || `${i+1}.`} ${s.nombre} - S/${s.precio}`).join('\n')
 }
 
 export async function procesarMensaje(telefono, mensaje, phoneNumberId) {
@@ -40,6 +49,7 @@ export async function procesarMensaje(telefono, mensaje, phoneNumberId) {
   console.log('📱 Telefono:', telefono)
   console.log('💬 Texto:', texto)
 
+  // Buscar salón
   const { data: salon } = await supabase
     .from('salones')
     .select('*')
@@ -49,8 +59,25 @@ export async function procesarMensaje(telefono, mensaje, phoneNumberId) {
   const salonId = salon?.id || null
   const salonNombre = salon?.nombre || 'Salón AgendaYa'
 
-  const MENU = `Hola! Bienvenida a *${salonNombre}* 💅\n\nNuestros servicios:\n1️⃣ Corte - S/30\n2️⃣ Tinte - S/80\n3️⃣ Peinado - S/40\n4️⃣ Manicure - S/25\n\nEscribe *agendar* para reservar tu cita`
+  // Cargar config y servicios del salón
+  const config = salonId ? await obtenerConfigSalon(salonId) : null
+  const servicios = salonId ? await obtenerServiciosSalon(salonId) : []
 
+  // Nombre del asistente
+  const nombreAsistente = config?.nombre_asistente || 'tu asistente'
+
+  // Mensaje de bienvenida personalizado o por defecto
+  const menuServicios = servicios.length > 0
+    ? construirMenuServicios(servicios)
+    : '1️⃣ Corte - S/30\n2️⃣ Tinte - S/80\n3️⃣ Peinado - S/40\n4️⃣ Manicure - S/25'
+
+  const mensajeBienvenida = config?.mensaje_bienvenida
+    ? config.mensaje_bienvenida
+    : `¡Hola! 😊 Bienvenida a *${salonNombre}*. Soy ${nombreAsistente}, tu asistente virtual.`
+
+  const MENU = `${mensajeBienvenida}\n\n*Nuestros servicios:*\n${menuServicios}\n\nEscribe *agendar* para reservar tu cita 💅`
+
+  // Cargar conversación
   const { data: conv } = await supabase
     .from('conversaciones')
     .select('*')
@@ -60,7 +87,7 @@ export async function procesarMensaje(telefono, mensaje, phoneNumberId) {
   const paso = conv?.paso || 'inicio'
   console.log('📍 Paso actual:', paso)
 
-  if (texto === 'hola' || texto === 'hi' || texto === 'buenas') {
+  if (texto === 'hola' || texto === 'hi' || texto === 'buenas' || paso === 'inicio') {
     await supabase.from('conversaciones').upsert(
       { telefono, paso: 'inicio' },
       { onConflict: 'telefono' }
@@ -76,31 +103,30 @@ export async function procesarMensaje(telefono, mensaje, phoneNumberId) {
       { telefono, paso: 'eligiendo_servicio' },
       { onConflict: 'telefono' }
     )
-    return `¿Qué servicio quieres?\n\n1️⃣ Corte - S/30\n2️⃣ Tinte - S/80\n3️⃣ Peinado - S/40\n4️⃣ Manicure - S/25\n\nEscribe el número (1, 2, 3 o 4)`
+    return `¿Qué servicio quieres? 💅\n\n${menuServicios}\n\nEscribe el número de tu elección`
   }
 
   if (paso === 'eligiendo_servicio') {
-    const nombreServicio = SERVICIOS[texto]
-    if (!nombreServicio) return 'Por favor escribe 1, 2, 3 o 4 para elegir tu servicio'
+    const indice = parseInt(texto) - 1
+    if (isNaN(indice) || indice < 0 || indice >= servicios.length) {
+      return `Por favor escribe el número de tu servicio (1 al ${servicios.length})`
+    }
 
-    const { data: servicioDb } = await supabase
-      .from('servicios')
-      .select('id, nombre, precio')
-      .eq('nombre', nombreServicio)
-      .single()
-
-    if (!servicioDb) return 'Error al buscar el servicio. Escribe *agendar* para intentar de nuevo.'
+    const servicioElegido = servicios[indice]
 
     await supabase.from('conversaciones').upsert(
-      { telefono, paso: 'eligiendo_fecha', servicio_id: servicioDb.id },
+      { telefono, paso: 'eligiendo_fecha', servicio_id: servicioElegido.id },
       { onConflict: 'telefono' }
     )
-    return `Elegiste *${servicioDb.nombre}* - S/${servicioDb.precio} ✅\n\n¿Qué día quieres tu cita?\nEscribe la fecha así: *2026-04-25*`
+    return `Elegiste *${servicioElegido.nombre}* - S/${servicioElegido.precio} ✅\n\n¿Qué día quieres tu cita?\nEscribe la fecha así: *2026-04-25*`
   }
 
   if (paso === 'eligiendo_fecha') {
     const fechaRegex = /^\d{4}-\d{2}-\d{2}$/
     if (!fechaRegex.test(texto)) return 'Escribe la fecha así: *2026-04-25*'
+
+    const fecha = new Date(texto)
+    if (isNaN(fecha.getTime())) return 'Fecha inválida. Escribe así: *2026-04-25*'
 
     await supabase.from('conversaciones').upsert(
       { telefono, paso: 'eligiendo_hora', fecha: texto },
@@ -112,6 +138,9 @@ export async function procesarMensaje(telefono, mensaje, phoneNumberId) {
   if (paso === 'eligiendo_hora') {
     const horaRegex = /^\d{2}:\d{2}$/
     if (!horaRegex.test(texto)) return 'Escribe la hora así: *10:00*'
+
+    const [h, m] = texto.split(':').map(Number)
+    if (h < 6 || h > 21 || m > 59) return 'Hora inválida. Escribe una hora entre 06:00 y 21:00'
 
     const { error: citaError } = await supabase.from('citas').insert({
       cliente_telefono: telefono,
@@ -132,7 +161,8 @@ export async function procesarMensaje(telefono, mensaje, phoneNumberId) {
 
     await supabase.from('conversaciones').delete().eq('telefono', telefono)
 
-    return `✅ *Cita confirmada!*\n\nFecha: ${conv.fecha}\nHora: ${texto}\n\nTe esperamos en *${salonNombre}*! 💅`
+    const direccion = config?.direccion ? `\n📍 ${config.direccion}` : ''
+    return `✅ *¡Cita confirmada!*\n\nServicio: ${servicios.find(s => s.id === conv.servicio_id)?.nombre || 'tu servicio'}\n📅 Fecha: ${conv.fecha}\n⏰ Hora: ${texto}${direccion}\n\n¡Te esperamos en *${salonNombre}*! 💕`
   }
 
   return MENU
