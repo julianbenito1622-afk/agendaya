@@ -69,9 +69,14 @@ export default function Panel() {
               <p style={{fontSize: '12px', color: '#9CA3AF', margin: 0, textTransform: 'capitalize'}}>{salon?.plan || 'free'}</p>
             </div>
           </div>
-          <button onClick={cerrarSesion} style={{background: 'none', border: '1px solid #E5E7EB', borderRadius: '8px', padding: '7px 14px', fontSize: '13px', color: '#6B7280', cursor: 'pointer'}}>
-            Salir
-          </button>
+          <div style={{display: 'flex', gap: '8px'}}>
+  <a href="/panel/bot" style={{background: '#F3F4F6', border: 'none', borderRadius: '8px', padding: '7px 14px', fontSize: '13px', color: '#374151', cursor: 'pointer', textDecoration: 'none', fontWeight: '500'}}>
+    ⚙️ Mi bot
+  </a>
+  <button onClick={cerrarSesion} style={{background: 'none', border: '1px solid #E5E7EB', borderRadius: '8px', padding: '7px 14px', fontSize: '13px', color: '#6B7280', cursor: 'pointer'}}>
+    Salir
+  </button>
+</div>
         </div>
       </div>
 
