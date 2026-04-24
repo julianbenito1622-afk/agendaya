@@ -4,7 +4,6 @@ import { supabase } from '@/lib/supabase'
 
 type Cita = {
   id: string
-  cliente_nombre: string
   cliente_telefono: string
   fecha: string
   hora: string
@@ -15,25 +14,21 @@ type Cita = {
 export default function Panel() {
   const [citas, setCitas] = useState<Cita[]>([])
   const [loading, setLoading] = useState(true)
-  const [salonNombre, setSalonNombre] = useState('')
+  const [salon, setSalon] = useState<any>(null)
   const hoy = new Date().toISOString().split('T')[0]
 
   useEffect(() => {
-    async function cargarCitas() {
-      const salonData = localStorage.getItem('salon')
-      if (!salonData) {
-        window.location.href = '/login'
-        return
-      }
-      const salon = JSON.parse(salonData)
-      setSalonNombre(salon.nombre)
+    const salonData = localStorage.getItem('salon')
+    if (!salonData) { window.location.href = '/login'; return }
+    const s = JSON.parse(salonData)
+    setSalon(s)
 
+    async function cargarCitas() {
       const { data } = await supabase
         .from('citas')
         .select('*, servicios(nombre, precio)')
-        .eq('salon_id', salon.id)
+        .eq('salon_id', s.id)
         .order('fecha', { ascending: true })
-
       if (data) setCitas(data)
       setLoading(false)
     }
@@ -43,158 +38,157 @@ export default function Panel() {
   const citasHoy = citas.filter(c => c.fecha === hoy)
   const citasFuturas = citas.filter(c => c.fecha > hoy)
   const totalHoy = citasHoy.reduce((sum, c) => sum + (c.servicios?.precio || 0), 0)
+  const pendientes = citasHoy.filter(c => c.estado === 'pendiente').length
 
   async function actualizarEstado(id: string, estado: string) {
     await supabase.from('citas').update({ estado }).eq('id', id)
     setCitas(citas.map(c => c.id === id ? {...c, estado} : c))
   }
 
-  async function cerrarSesion() {
-    await supabase.auth.signOut()
+  function cerrarSesion() {
     localStorage.removeItem('salon')
     window.location.href = '/login'
   }
 
-  const colorEstado: Record<string, string> = {
-    pendiente: '#f59e0b',
-    confirmada: '#10b981',
-    cancelada: '#ef4444'
+  const estadoColor: Record<string, {bg: string, text: string}> = {
+    pendiente:  { bg: '#FFF7ED', text: '#C2410C' },
+    confirmada: { bg: '#F0FDF4', text: '#15803D' },
+    cancelada:  { bg: '#FEF2F2', text: '#B91C1C' },
   }
 
   return (
-    <main style={{fontFamily: "'Georgia', serif", background: '#faf7f4', minHeight: '100vh'}}>
+    <div style={{fontFamily: "'DM Sans', system-ui, sans-serif", background: '#F9FAFB', minHeight: '100vh'}}>
 
       {/* Header */}
-      <div style={{background: 'white', borderBottom: '1px solid #ede8e3', padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-        <div>
-          <h1 style={{fontSize: '22px', fontWeight: '700', color: '#1a1a1a', margin: 0}}>
-            Agenda<span style={{color: '#f7426f'}}>Ya</span>
-          </h1>
-          <p style={{color: '#a89a8a', fontSize: '12px', margin: '2px 0 0', fontFamily: 'monospace'}}>
-            {salonNombre || 'MI SALÓN'}
-          </p>
-        </div>
-        <div style={{display: 'flex', gap: '12px', alignItems: 'center'}}>
-          <div style={{background: '#fff8f9', border: '1px solid #f7426f', borderRadius: '10px', padding: '8px 14px', textAlign: 'right'}}>
-            <p style={{color: '#f7426f', fontSize: '11px', margin: 0, fontFamily: 'monospace'}}>HOY</p>
-            <p style={{color: '#1a1a1a', fontSize: '18px', fontWeight: '700', margin: 0}}>S/{totalHoy}</p>
+      <div style={{background: 'white', borderBottom: '1px solid #F3F4F6', padding: '0 24px'}}>
+        <div style={{maxWidth: '900px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '64px'}}>
+          <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+            <div style={{width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #FF4D6A, #FF6B84)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px'}}>💅</div>
+            <div>
+              <p style={{fontSize: '15px', fontWeight: '600', color: '#111827', margin: 0}}>{salon?.nombre || 'Mi Salón'}</p>
+              <p style={{fontSize: '12px', color: '#9CA3AF', margin: 0, textTransform: 'capitalize'}}>{salon?.plan || 'free'}</p>
+            </div>
           </div>
-          <button
-            onClick={cerrarSesion}
-            style={{background: 'none', border: '1px solid #ede8e3', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: '#a89a8a', cursor: 'pointer'}}
-          >
+          <button onClick={cerrarSesion} style={{background: 'none', border: '1px solid #E5E7EB', borderRadius: '8px', padding: '7px 14px', fontSize: '13px', color: '#6B7280', cursor: 'pointer'}}>
             Salir
           </button>
         </div>
       </div>
 
-      <div style={{padding: '24px', maxWidth: '480px', margin: '0 auto'}}>
+      <div style={{maxWidth: '900px', margin: '0 auto', padding: '24px'}}>
+
+        {/* Stats cards */}
+        <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '28px'}}>
+          <div style={{background: 'white', borderRadius: '14px', padding: '20px', border: '1px solid #F3F4F6'}}>
+            <p style={{fontSize: '12px', color: '#9CA3AF', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Citas hoy</p>
+            <p style={{fontSize: '32px', fontWeight: '700', color: '#111827', margin: 0}}>{citasHoy.length}</p>
+          </div>
+          <div style={{background: 'white', borderRadius: '14px', padding: '20px', border: '1px solid #F3F4F6'}}>
+            <p style={{fontSize: '12px', color: '#9CA3AF', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Pendientes</p>
+            <p style={{fontSize: '32px', fontWeight: '700', color: '#C2410C', margin: 0}}>{pendientes}</p>
+          </div>
+          <div style={{background: 'linear-gradient(135deg, #FF4D6A, #FF6B84)', borderRadius: '14px', padding: '20px'}}>
+            <p style={{fontSize: '12px', color: 'rgba(255,255,255,0.8)', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Ingresos hoy</p>
+            <p style={{fontSize: '32px', fontWeight: '700', color: 'white', margin: 0}}>S/{totalHoy}</p>
+          </div>
+        </div>
 
         {loading ? (
-          <p style={{color: '#a89a8a', textAlign: 'center', marginTop: '60px'}}>Cargando citas...</p>
+          <div style={{textAlign: 'center', padding: '60px', color: '#9CA3AF'}}>Cargando citas...</div>
         ) : (
           <>
             {/* Citas de hoy */}
-            <div style={{marginBottom: '32px'}}>
-              <p style={{color: '#b09a8a', fontSize: '11px', letterSpacing: '2px', marginBottom: '16px', fontFamily: 'monospace'}}>
-                HOY — {citasHoy.length} CITA{citasHoy.length !== 1 ? 'S' : ''}
+            <div style={{marginBottom: '28px'}}>
+              <p style={{fontSize: '13px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px'}}>
+                Hoy · {new Date().toLocaleDateString('es-PE', {weekday: 'long', day: 'numeric', month: 'long'})}
               </p>
-
               {citasHoy.length === 0 ? (
-                <div style={{background: 'white', border: '1px solid #ede8e3', borderRadius: '14px', padding: '32px', textAlign: 'center'}}>
-                  <p style={{color: '#c4b5a5', fontSize: '14px', margin: 0}}>Sin citas para hoy</p>
+                <div style={{background: 'white', borderRadius: '14px', padding: '40px', textAlign: 'center', border: '1px solid #F3F4F6'}}>
+                  <p style={{fontSize: '32px', marginBottom: '8px'}}>📅</p>
+                  <p style={{color: '#9CA3AF', fontSize: '14px', margin: 0}}>Sin citas para hoy</p>
                 </div>
               ) : (
-                citasHoy.map(cita => (
-                  <div key={cita.id} style={{background: 'white', border: '1px solid #ede8e3', borderRadius: '14px', padding: '18px', marginBottom: '12px'}}>
-                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
-                      <div>
-                        <p style={{fontWeight: '600', fontSize: '15px', color: '#1a1a1a', margin: '0 0 4px'}}>
-                          {cita.cliente_nombre || 'Cliente'}
-                        </p>
-                        <p style={{color: '#a89a8a', fontSize: '13px', margin: '0 0 8px', fontFamily: 'monospace'}}>
-                          {cita.cliente_telefono}
-                        </p>
-                        <p style={{color: '#f7426f', fontSize: '14px', fontWeight: '600', margin: 0}}>
-                          {cita.servicios?.nombre} · S/{cita.servicios?.precio}
-                        </p>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
+                  {citasHoy.map(cita => (
+                    <div key={cita.id} style={{background: 'white', borderRadius: '14px', padding: '18px 20px', border: '1px solid #F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px'}}>
+                      <div style={{display: 'flex', alignItems: 'center', gap: '14px'}}>
+                        <div style={{width: '44px', height: '44px', borderRadius: '12px', background: '#FFF1F3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0}}>✂️</div>
+                        <div>
+                          <p style={{fontWeight: '600', fontSize: '14px', color: '#111827', margin: '0 0 2px'}}>
+                            {cita.servicios?.nombre || 'Servicio'}
+                          </p>
+                          <p style={{fontSize: '13px', color: '#9CA3AF', margin: 0, fontFamily: 'monospace'}}>
+                            {cita.cliente_telefono}
+                          </p>
+                        </div>
                       </div>
-                      <div style={{textAlign: 'right'}}>
-                        <p style={{fontSize: '18px', fontWeight: '700', color: '#1a1a1a', margin: '0 0 4px', fontFamily: 'monospace'}}>
-                          {cita.hora?.slice(0,5)}
-                        </p>
+                      <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+                        <div style={{textAlign: 'right'}}>
+                          <p style={{fontSize: '18px', fontWeight: '700', color: '#111827', margin: '0 0 2px', fontFamily: 'monospace'}}>{cita.hora?.slice(0,5)}</p>
+                          <p style={{fontSize: '13px', color: '#FF4D6A', fontWeight: '600', margin: 0}}>S/{cita.servicios?.precio}</p>
+                        </div>
                         <span style={{
-                          background: colorEstado[cita.estado] + '20',
-                          color: colorEstado[cita.estado],
-                          fontSize: '11px',
-                          padding: '3px 10px',
-                          borderRadius: '20px',
-                          fontFamily: 'monospace'
-                        }}>
-                          {cita.estado.toUpperCase()}
-                        </span>
+                          background: estadoColor[cita.estado]?.bg || '#F3F4F6',
+                          color: estadoColor[cita.estado]?.text || '#6B7280',
+                          padding: '4px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', whiteSpace: 'nowrap'
+                        }}>{cita.estado}</span>
+                        {cita.estado === 'pendiente' && (
+                          <div style={{display: 'flex', gap: '6px'}}>
+                            <button onClick={() => actualizarEstado(cita.id, 'confirmada')}
+                              style={{background: '#DCFCE7', color: '#15803D', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer'}}>
+                              ✓
+                            </button>
+                            <button onClick={() => actualizarEstado(cita.id, 'cancelada')}
+                              style={{background: '#FEE2E2', color: '#B91C1C', border: 'none', padding: '7px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer'}}>
+                              ✗
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
-
-                    {cita.estado === 'pendiente' && (
-                      <div style={{display: 'flex', gap: '8px', marginTop: '14px'}}>
-                        <button
-                          onClick={() => actualizarEstado(cita.id, 'confirmada')}
-                          style={{flex: 1, background: '#10b981', color: 'white', border: 'none', padding: '10px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer'}}
-                        >
-                          Confirmar
-                        </button>
-                        <button
-                          onClick={() => actualizarEstado(cita.id, 'cancelada')}
-                          style={{flex: 1, background: '#fff', color: '#ef4444', border: '1px solid #ef4444', padding: '10px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer'}}
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </div>
 
             {/* Próximas citas */}
             {citasFuturas.length > 0 && (
               <div>
-                <p style={{color: '#b09a8a', fontSize: '11px', letterSpacing: '2px', marginBottom: '16px', fontFamily: 'monospace'}}>
-                  PRÓXIMAS — {citasFuturas.length} CITA{citasFuturas.length !== 1 ? 'S' : ''}
+                <p style={{fontSize: '13px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px'}}>
+                  Próximas · {citasFuturas.length} cita{citasFuturas.length !== 1 ? 's' : ''}
                 </p>
-                {citasFuturas.map(cita => (
-                  <div key={cita.id} style={{background: 'white', border: '1px solid #ede8e3', borderRadius: '14px', padding: '16px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                    <div>
-                      <p style={{fontWeight: '600', fontSize: '14px', color: '#1a1a1a', margin: '0 0 4px'}}>
-                        {cita.cliente_nombre || 'Cliente'}
-                      </p>
-                      <p style={{color: '#f7426f', fontSize: '13px', margin: 0}}>
-                        {cita.servicios?.nombre} · S/{cita.servicios?.precio}
-                      </p>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                  {citasFuturas.map(cita => (
+                    <div key={cita.id} style={{background: 'white', borderRadius: '12px', padding: '14px 18px', border: '1px solid #F3F4F6', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                      <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+                        <div style={{width: '38px', height: '38px', borderRadius: '10px', background: '#F9FAFB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px'}}>✂️</div>
+                        <div>
+                          <p style={{fontWeight: '600', fontSize: '14px', color: '#111827', margin: '0 0 2px'}}>{cita.servicios?.nombre}</p>
+                          <p style={{fontSize: '12px', color: '#9CA3AF', margin: 0}}>{cita.cliente_telefono}</p>
+                        </div>
+                      </div>
+                      <div style={{textAlign: 'right'}}>
+                        <p style={{fontSize: '13px', fontWeight: '600', color: '#374151', margin: '0 0 2px'}}>
+                          {new Date(cita.fecha + 'T00:00:00').toLocaleDateString('es-PE', {day: 'numeric', month: 'short'})}
+                        </p>
+                        <p style={{fontSize: '12px', color: '#9CA3AF', margin: 0, fontFamily: 'monospace'}}>{cita.hora?.slice(0,5)}</p>
+                      </div>
                     </div>
-                    <div style={{textAlign: 'right'}}>
-                      <p style={{fontSize: '13px', fontWeight: '600', color: '#1a1a1a', margin: '0 0 2px', fontFamily: 'monospace'}}>
-                        {cita.fecha}
-                      </p>
-                      <p style={{color: '#a89a8a', fontSize: '12px', margin: 0, fontFamily: 'monospace'}}>
-                        {cita.hora?.slice(0,5)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
 
             {citas.length === 0 && (
-              <div style={{textAlign: 'center', marginTop: '60px'}}>
-                <p style={{color: '#c4b5a5', fontSize: '15px', marginBottom: '8px'}}>Sin citas por ahora</p>
-                <p style={{color: '#d4c5b5', fontSize: '13px'}}>Las citas aparecerán aquí cuando alguien agende por WhatsApp</p>
+              <div style={{textAlign: 'center', padding: '80px 0'}}>
+                <p style={{fontSize: '48px', marginBottom: '16px'}}>💅</p>
+                <p style={{fontSize: '16px', color: '#374151', fontWeight: '600', marginBottom: '8px'}}>Sin citas por ahora</p>
+                <p style={{fontSize: '14px', color: '#9CA3AF'}}>Las citas aparecerán aquí cuando alguien agende por WhatsApp</p>
               </div>
             )}
           </>
         )}
       </div>
-    </main>
+    </div>
   )
 }
