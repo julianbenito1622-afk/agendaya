@@ -8,7 +8,7 @@ type Cita = {
   fecha: string
   hora: string
   estado: string
-  servicios: { nombre: string; precio: number }
+  servicios_salon: { nombre: string; precio: number }
 }
 
 export default function Panel() {
@@ -26,7 +26,7 @@ export default function Panel() {
     async function cargarCitas() {
       const { data } = await supabase
         .from('citas')
-        .select('*, servicios(nombre, precio)')
+        .select('*, servicios_salon(nombre, precio)')
         .eq('salon_id', s.id)
         .order('fecha', { ascending: true })
       if (data) setCitas(data)
@@ -37,7 +37,7 @@ export default function Panel() {
 
   const citasHoy = citas.filter(c => c.fecha === hoy)
   const citasFuturas = citas.filter(c => c.fecha > hoy)
-  const totalHoy = citasHoy.reduce((sum, c) => sum + (c.servicios?.precio || 0), 0)
+  const totalHoy = citasHoy.reduce((sum, c) => sum + (c.servicios_salon?.precio || 0), 0)
   const pendientes = citasHoy.filter(c => c.estado === 'pendiente').length
 
   async function actualizarEstado(id: string, estado: string) {
@@ -59,7 +59,6 @@ export default function Panel() {
   return (
     <div style={{fontFamily: "'DM Sans', system-ui, sans-serif", background: '#F9FAFB', minHeight: '100vh'}}>
 
-      {/* Header */}
       <div style={{background: 'white', borderBottom: '1px solid #F3F4F6', padding: '0 24px'}}>
         <div style={{maxWidth: '900px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '64px'}}>
           <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
@@ -70,19 +69,18 @@ export default function Panel() {
             </div>
           </div>
           <div style={{display: 'flex', gap: '8px'}}>
-  <a href="/panel/bot" style={{background: '#F3F4F6', border: 'none', borderRadius: '8px', padding: '7px 14px', fontSize: '13px', color: '#374151', cursor: 'pointer', textDecoration: 'none', fontWeight: '500'}}>
-    ⚙️ Mi bot
-  </a>
-  <button onClick={cerrarSesion} style={{background: 'none', border: '1px solid #E5E7EB', borderRadius: '8px', padding: '7px 14px', fontSize: '13px', color: '#6B7280', cursor: 'pointer'}}>
-    Salir
-  </button>
-</div>
+            <a href="/panel/bot" style={{background: '#F3F4F6', border: 'none', borderRadius: '8px', padding: '7px 14px', fontSize: '13px', color: '#374151', cursor: 'pointer', textDecoration: 'none', fontWeight: '500'}}>
+              ⚙️ Mi bot
+            </a>
+            <button onClick={cerrarSesion} style={{background: 'none', border: '1px solid #E5E7EB', borderRadius: '8px', padding: '7px 14px', fontSize: '13px', color: '#6B7280', cursor: 'pointer'}}>
+              Salir
+            </button>
+          </div>
         </div>
       </div>
 
       <div style={{maxWidth: '900px', margin: '0 auto', padding: '24px'}}>
 
-        {/* Stats cards */}
         <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '28px'}}>
           <div style={{background: 'white', borderRadius: '14px', padding: '20px', border: '1px solid #F3F4F6'}}>
             <p style={{fontSize: '12px', color: '#9CA3AF', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Citas hoy</p>
@@ -102,7 +100,6 @@ export default function Panel() {
           <div style={{textAlign: 'center', padding: '60px', color: '#9CA3AF'}}>Cargando citas...</div>
         ) : (
           <>
-            {/* Citas de hoy */}
             <div style={{marginBottom: '28px'}}>
               <p style={{fontSize: '13px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px'}}>
                 Hoy · {new Date().toLocaleDateString('es-PE', {weekday: 'long', day: 'numeric', month: 'long'})}
@@ -120,7 +117,7 @@ export default function Panel() {
                         <div style={{width: '44px', height: '44px', borderRadius: '12px', background: '#FFF1F3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0}}>✂️</div>
                         <div>
                           <p style={{fontWeight: '600', fontSize: '14px', color: '#111827', margin: '0 0 2px'}}>
-                            {cita.servicios?.nombre || 'Servicio'}
+                            {cita.servicios_salon?.nombre || 'Servicio'}
                           </p>
                           <p style={{fontSize: '13px', color: '#9CA3AF', margin: 0, fontFamily: 'monospace'}}>
                             {cita.cliente_telefono}
@@ -130,7 +127,7 @@ export default function Panel() {
                       <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
                         <div style={{textAlign: 'right'}}>
                           <p style={{fontSize: '18px', fontWeight: '700', color: '#111827', margin: '0 0 2px', fontFamily: 'monospace'}}>{cita.hora?.slice(0,5)}</p>
-                          <p style={{fontSize: '13px', color: '#FF4D6A', fontWeight: '600', margin: 0}}>S/{cita.servicios?.precio}</p>
+                          <p style={{fontSize: '13px', color: '#FF4D6A', fontWeight: '600', margin: 0}}>S/{cita.servicios_salon?.precio}</p>
                         </div>
                         <span style={{
                           background: estadoColor[cita.estado]?.bg || '#F3F4F6',
@@ -156,7 +153,6 @@ export default function Panel() {
               )}
             </div>
 
-            {/* Próximas citas */}
             {citasFuturas.length > 0 && (
               <div>
                 <p style={{fontSize: '13px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px'}}>
@@ -168,7 +164,7 @@ export default function Panel() {
                       <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
                         <div style={{width: '38px', height: '38px', borderRadius: '10px', background: '#F9FAFB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px'}}>✂️</div>
                         <div>
-                          <p style={{fontWeight: '600', fontSize: '14px', color: '#111827', margin: '0 0 2px'}}>{cita.servicios?.nombre}</p>
+                          <p style={{fontWeight: '600', fontSize: '14px', color: '#111827', margin: '0 0 2px'}}>{cita.servicios_salon?.nombre}</p>
                           <p style={{fontSize: '12px', color: '#9CA3AF', margin: 0}}>{cita.cliente_telefono}</p>
                         </div>
                       </div>

@@ -34,7 +34,7 @@ export async function enviarRecordatorios() {
 
   const { data: citas } = await supabase
     .from('citas')
-    .select('*, servicios(nombre), salones(nombre)')
+    .select('*, servicios_salon(nombre), salones(nombre)')
     .eq('fecha', fechaManana)
     .eq('estado', 'pendiente')
 
@@ -46,8 +46,7 @@ export async function enviarRecordatorios() {
   console.log(`📨 Enviando ${citas.length} recordatorios`)
 
   for (const cita of citas) {
-    const mensaje = `Hola! 💅 Te recordamos que mañana tienes una cita en *${cita.salones?.nombre || 'tu salón'}*.\n\n📅 Fecha: ${cita.fecha}\n⏰ Hora: ${cita.hora?.slice(0,5)}\n✂️ Servicio: ${cita.servicios?.nombre}\n\nEscribe *confirmar* para confirmar o *cancelar* para cancelar.`
-
+    const mensaje = `Hola! 💅 Te recordamos que mañana tienes una cita en *${cita.salones?.nombre || 'tu salón'}*.\n\n📅 Fecha: ${cita.fecha}\n⏰ Hora: ${cita.hora?.slice(0,5)}\n✂️ Servicio: ${cita.servicios_salon?.nombre}\n\nEscribe *confirmar* para confirmar o *cancelar* para cancelar.`
     await enviarMensaje(cita.cliente_telefono, mensaje)
     console.log('✅ Recordatorio enviado a:', cita.cliente_telefono)
   }
